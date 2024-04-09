@@ -2,7 +2,7 @@ Summary: NFS utilities and supporting clients and daemons for the kernel NFS ser
 Name: nfs-utils
 URL: http://linux-nfs.org/
 Version: 2.6.4
-Release: 0.rc6%{?dist}
+Release: 0.rc6%{?dist}.1
 Epoch: 1
 
 # group all 32bit related archs
@@ -39,6 +39,18 @@ Provides: umount.nfs  = %{epoch}:%{version}-%{release}
 Provides: umount.nfs4 = %{epoch}:%{version}-%{release}
 Provides: sm-notify   = %{epoch}:%{version}-%{release}
 Provides: start-statd = %{epoch}:%{version}-%{release}
+
+%if "%{_sbindir}" == "%{_bindir}"
+# Compat symlinks for Requires in other packages.
+# We rely on filesystem to create the symlinks for us.
+Requires: filesystem(unmerged-sbin-symlinks)
+Provides: /sbin/mount.nfs
+Provides: /sbin/mount.nfs4
+Provides: /sbin/nfsdcltrack
+Provides: /sbin/rpc.statd
+Provides: /usr/sbin/rpc.mountd
+Provides: /usr/sbin/rpc.nfsd
+%endif
 
 License: MIT and GPLv2 and GPLv2+ and BSD
 BuildRequires: make
@@ -164,9 +176,6 @@ sh -x autogen.sh
 %install
 %global _pkgdir %{_prefix}/lib/systemd
 
-rm -rf $RPM_BUILD_ROOT/*
-
-mkdir -p $RPM_BUILD_ROOT/sbin
 mkdir -p $RPM_BUILD_ROOT%{_sbindir}
 mkdir -p $RPM_BUILD_ROOT%{_libexecdir}/nfs-utils/
 mkdir -p $RPM_BUILD_ROOT%{_pkgdir}/system
@@ -194,7 +203,6 @@ rm -rf $RPM_BUILD_ROOT%{_libdir}/libnfsidmap/*.{a,la}
 mkdir -p $RPM_BUILD_ROOT%{_sharedstatedir}/nfs/rpc_pipefs
 
 touch $RPM_BUILD_ROOT%{_sharedstatedir}/nfs/rmtab
-mv $RPM_BUILD_ROOT%{_sbindir}/rpc.statd $RPM_BUILD_ROOT/sbin
 
 mkdir -p $RPM_BUILD_ROOT%{_sharedstatedir}/nfs/statd/sm
 mkdir -p $RPM_BUILD_ROOT%{_sharedstatedir}/nfs/statd/sm.bak
@@ -204,7 +212,8 @@ mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/exports.d
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nfsmount.conf.d
 install -m 644 %{SOURCE4} $RPM_BUILD_ROOT%{_sysconfdir}/nfsmount.conf.d
 
-mkdir -p $RPM_BUILD_ROOT%{_udevrulesdir}
+# Some files get installed in /sbin, move them under /usr.
+mv -v $RPM_BUILD_ROOT/sbin/* $RPM_BUILD_ROOT%{_sbindir}/
 
 %pre
 # move files so the running service will have this applied as well
@@ -298,8 +307,8 @@ rm -rf /etc/systemd/system/rpc-*.requires
 
 %doc linux-nfs/ChangeLog linux-nfs/KNOWNBUGS linux-nfs/NEW linux-nfs/README
 %doc linux-nfs/THANKS linux-nfs/TODO
-/sbin/rpc.statd
-/sbin/nfsdcltrack
+%{_sbindir}/rpc.statd
+%{_sbindir}/nfsdcltrack
 %{_sbindir}/exportfs
 %{_sbindir}/nfsstat
 %{_sbindir}/rpcdebug
@@ -326,11 +335,11 @@ rm -rf /etc/systemd/system/rpc-*.requires
 %{_mandir}/*/*
 %{_pkgdir}/*/*
 
-%attr(4755,root,root)	/sbin/mount.nfs
+%attr(4755,root,root) %{_sbindir}/mount.nfs
 
-/sbin/mount.nfs4
-/sbin/umount.nfs
-/sbin/umount.nfs4
+%{_sbindir}/mount.nfs4
+%{_sbindir}/umount.nfs
+%{_sbindir}/umount.nfs4
 
 %files -n libnfsidmap
 %doc support/nfsidmap/AUTHORS support/nfsidmap/README support/nfsidmap/COPYING
@@ -359,11 +368,11 @@ rm -rf /etc/systemd/system/rpc-*.requires
 %{_sbindir}/rpc.gssd
 %{_sbindir}/start-statd
 %{_sbindir}/showmount
-%attr(4755,root,root) /sbin/mount.nfs
-/sbin/mount.nfs4
-/sbin/rpc.statd
-/sbin/umount.nfs
-/sbin/umount.nfs4
+%attr(4755,root,root) %{_sbindir}/mount.nfs
+%{_sbindir}/mount.nfs4
+%{_sbindir}/rpc.statd
+%{_sbindir}/umount.nfs
+%{_sbindir}/umount.nfs4
 %{_mandir}/*/nfs.5.gz
 %{_mandir}/*/nfs.conf.5.gz
 %{_mandir}/*/nfsmount.conf.5.gz
@@ -401,10 +410,10 @@ rm -rf /etc/systemd/system/rpc-*.requires
 %{_sbindir}/nfsstat
 %{_libexecdir}/nfsrahead
 %{_udevrulesdir}/99-nfs.rules
-%attr(4755,root,root) /sbin/mount.nfs
-/sbin/mount.nfs4
-/sbin/umount.nfs
-/sbin/umount.nfs4
+%attr(4755,root,root) %{_sbindir}/mount.nfs
+%{_sbindir}/mount.nfs4
+%{_sbindir}/umount.nfs
+%{_sbindir}/umount.nfs4
 %{_mandir}/*/nfs.5.gz
 %{_mandir}/*/nfs.conf.5.gz
 %{_mandir}/*/nfsmount.conf.5.gz
@@ -430,6 +439,10 @@ rm -rf /etc/systemd/system/rpc-*.requires
 %{_mandir}/*/nfsiostat.8.gz
 
 %changelog
+* Thu Apr 18 2024 Zbigniew Jedrzejewski-Szmek <zbyszek@in.waw.pl> - 2.6.4-0.rc6.1
+- Move files from /usr/sbin to /usr/bin in rpm file listing
+  (https://pagure.io/packaging-committee/pull-request/1355)
+
 * Thu Apr 11 2024 Steve Dickson <steved@redhat.com> 2.6.4-0.rc6
 - Updated to the latest RC release: nfs-utils-2-7-1-rc6
 
