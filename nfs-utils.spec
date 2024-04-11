@@ -413,11 +413,9 @@ rm -rf /etc/systemd/system/rpc-*.requires
 %{_mandir}/*/mount.nfs.8.gz
 %{_mandir}/*/nfsconf.8.gz
 %{_mandir}/*/nfsidmap.8.gz
-%{_mandir}/*/rpc.gssd.8.gz
-%{_mandir}/*/mount.nfs.8.gz
-%{_mandir}/*/umount.nfs.8.gz
-%{_mandir}/*/nfsidmap.8.gz
 %{_mandir}/*/nfsstat.8.gz
+%{_mandir}/*/rpc.gssd.8.gz
+%{_mandir}/*/umount.nfs.8.gz
 %{_pkgdir}/*/rpc-pipefs-generator
 %{_pkgdir}/*/auth-rpcgss-module.service
 %{_pkgdir}/*/nfs-client.target
