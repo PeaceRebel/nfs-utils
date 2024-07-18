@@ -2,7 +2,7 @@ Summary: NFS utilities and supporting clients and daemons for the kernel NFS ser
 Name: nfs-utils
 URL: http://linux-nfs.org/
 Version: 2.6.4
-Release: 0.rc6%{?dist}.1
+Release: 0.rc6%{?dist}.2
 Epoch: 1
 
 # group all 32bit related archs
@@ -439,6 +439,9 @@ rm -rf /etc/systemd/system/rpc-*.requires
 %{_mandir}/*/nfsiostat.8.gz
 
 %changelog
+* Thu Jul 18 2024 Fedora Release Engineering <releng@fedoraproject.org> - 1:2.6.4-0.rc6.2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_41_Mass_Rebuild
+
 * Thu Apr 18 2024 Zbigniew Jedrzejewski-Szmek <zbyszek@in.waw.pl> - 2.6.4-0.rc6.1
 - Move files from /usr/sbin to /usr/bin in rpm file listing
   (https://pagure.io/packaging-committee/pull-request/1355)
