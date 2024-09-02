@@ -2,7 +2,7 @@ Summary: NFS utilities and supporting clients and daemons for the kernel NFS ser
 Name: nfs-utils
 URL: http://linux-nfs.org/
 Version: 2.7.1
-Release: 0%{?dist}
+Release: 1%{?dist}
 Epoch: 1
 
 # group all 32bit related archs
@@ -50,7 +50,8 @@ Provides: /usr/sbin/rpc.mountd
 Provides: /usr/sbin/rpc.nfsd
 %endif
 
-License: MIT and GPLv2 and GPLv2+ and BSD
+# Automatically converted from old format: MIT and GPLv2 and GPLv2+ and BSD - review is highly recommended.
+License: LicenseRef-Callaway-MIT AND GPL-2.0-only AND GPL-2.0-or-later AND LicenseRef-Callaway-BSD
 BuildRequires: make
 BuildRequires: libevent-devel libcap-devel libuuid-devel
 BuildRequires: libtirpc-devel >= 1.3.4 libblkid-devel
@@ -115,7 +116,8 @@ The nfsv4-client-utils packages provided NFSv4 client support
 %package -n libnfsidmap
 Summary: NFSv4 User and Group ID Mapping Library
 Provides: libnfsidmap%{?_isa} = %{epoch}:%{version}-%{release}
-License: BSD
+# Automatically converted from old format: BSD - review is highly recommended.
+License: LicenseRef-Callaway-BSD
 BuildRequires: pkgconfig, openldap-devel
 BuildRequires: automake, libtool
 Requires: openldap
@@ -437,6 +439,9 @@ rm -rf /etc/systemd/system/rpc-*.requires
 %{_mandir}/*/nfsiostat.8.gz
 
 %changelog
+* Mon Sep  2 2024 Miroslav Suchý <msuchy@redhat.com> - 1:2.7.1-1
+- convert license to SPDX
+
 * Tue Aug 20 2024 Steve Dickson <steved@redhat.com> 2.7.1-0
 - Updated to the latest upstream release: nfs-utils-2-7-1 (bz 2306819)
 
