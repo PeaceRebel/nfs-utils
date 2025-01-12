@@ -2,7 +2,7 @@ Summary: NFS utilities and supporting clients and daemons for the kernel NFS ser
 Name: nfs-utils
 URL: http://linux-nfs.org/
 Version: 2.8.2
-Release: 0.rc1%{?dist}
+Release: 0.rc1%{?dist}.1
 Epoch: 1
 
 # group all 32bit related archs
@@ -439,6 +439,9 @@ rm -rf /etc/systemd/system/rpc-*.requires
 %{_mandir}/*/nfsiostat.8.gz
 
 %changelog
+* Sun Jan 12 2025 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 1:2.8.2-0.rc1.1
+- Rebuilt for the bin-sbin merge (2nd attempt)
+
 * Fri Jan  3 2025 Steve Dickson <steved@redhat.com> 2.8.2-0.rc1
 - Updated to the latest RC release: nfs-utils-2-8-3-rc1
 
