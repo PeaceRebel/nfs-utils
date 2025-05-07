@@ -1,0 +1,261 @@
+diff --git a/tools/rpcctl/rpcctl.man b/tools/rpcctl/rpcctl.man
+index b87ba0df..2ee168c8 100644
+--- a/tools/rpcctl/rpcctl.man
++++ b/tools/rpcctl/rpcctl.man
+@@ -12,6 +12,7 @@ rpcctl \- Displays SunRPC connection information
+ .BR "rpcctl client show " "\fR[ \fB\-h \f| \fB\-\-help \fR] [ \fIXPRT \fR]"
+ .P
+ .BR "rpcctl switch" " \fR[ \fB\-h \fR| \fB\-\-help \fR] { \fBset \fR| \fBshow \fR}"
++.BR "rpcctl switch add-xprt" " \fR[ \fB\-h \fR| \fB\-\-help \fR] [ \fISWITCH \fR]"
+ .BR "rpcctl switch set" " \fR[ \fB\-h \fR| \fB\-\-help \fR] \fISWITCH \fBdstaddr \fINEWADDR"
+ .BR "rpcctl switch show" " \fR[ \fB\-h \fR| \fB\-\-help \fR] [ \fISWITCH \fR]"
+ .P
+@@ -29,6 +30,9 @@ Show detailed information about the RPC clients on this system.
+ If \fICLIENT \fRwas provided, then only show information about a single RPC client.
+ .P
+ .SS rpcctl switch \fR- \fBCommands operating on groups of transports
++.IP "\fBadd-xprt \fISWITCH"
++Add an aditional transport to the \fISWITCH\fR.
++Note that the new transport will take its values from the "main" transport.
+ .IP "\fBset \fISWITCH \fBdstaddr \fINEWADDR"
+ Change the destination address of all transports in the \fISWITCH \fRto \fINEWADDR\fR.
+ \fINEWADDR \fRcan be an IP address, DNS name, or anything else resolvable by \fBgethostbyname\fR(3).
+diff --git a/tools/rpcctl/rpcctl.py b/tools/rpcctl/rpcctl.py
+index 0221fbb6..29ae7d26 100755
+--- a/tools/rpcctl/rpcctl.py
++++ b/tools/rpcctl/rpcctl.py
+@@ -20,20 +20,20 @@ if not sunrpc.is_dir():
+     sys.exit(1)
+ 
+ 
+-def read_addr_file(path):
+-    """Read an xprt address file."""
++def read_sysfs_file(path, *, missing="enoent"):
++    """Read a sysfs file."""
+     try:
+         with open(path, 'r') as f:
+             return f.readline().strip()
+     except FileNotFoundError:
+-        return "(enoent)"
++        return f"({missing})"
+ 
+ 
+-def write_addr_file(path, newaddr):
+-    """Write a new address to an xprt address file."""
++def write_sysfs_file(path, input):
++    """Write 'input' to a sysfs file."""
+     with open(path, 'w') as f:
+-        f.write(newaddr)
+-    return read_addr_file(path)
++        f.write(input)
++    return read_sysfs_file(path)
+ 
+ 
+ def read_info_file(path):
+@@ -56,8 +56,9 @@ class Xprt:
+         self.name = path.stem.rsplit("-", 1)[0]
+         self.type = path.stem.split("-")[2]
+         self.info = read_info_file(path / "xprt_info")
+-        self.dstaddr = read_addr_file(path / "dstaddr")
+-        self.srcaddr = read_addr_file(path / "srcaddr")
++        self.dstaddr = read_sysfs_file(path / "dstaddr")
++        self.srcaddr = read_sysfs_file(path / "srcaddr")
++        self.xprtsec = read_sysfs_file(path / "xprtsec", missing="unknown")
+         self.read_state()
+ 
+     def __lt__(self, rhs):
+@@ -67,7 +68,8 @@ class Xprt:
+     def _xprt(self):
+         main = ", main" if self.info.get("main_xprt") else ""
+         return f"{self.name}: {self.type}, {self.dstaddr}, " \
+-               f"port {self.info['dst_port']}, state <{self.state}>{main}"
++               f"port {self.info['dst_port']}, sec {self.xprtsec}, " \
++               f"state <{self.state}>{main}"
+ 
+     def _src_reqs(self):
+         return f"	Source: {self.srcaddr}, port {self.info['src_port']}, " \
+@@ -106,7 +108,7 @@ class Xprt:
+ 
+     def set_dstaddr(self, newaddr):
+         """Change the dstaddr of an xprt."""
+-        self.dstaddr = write_addr_file(self.path / "dstaddr", newaddr)
++        self.dstaddr = write_sysfs_file(self.path / "dstaddr", newaddr)
+ 
+     def set_state(self, state):
+         """Change the state of an xprt."""
+@@ -183,14 +185,13 @@ class Xprt:
+ class XprtSwitch:
+     """Represents a group of xprt connections."""
+ 
+-    def __init__(self, path, sep=":"):
++    def __init__(self, path):
+         """Read in xprt switch information from sysfs."""
+         self.path = path
+         self.name = path.stem
+         self.info = read_info_file(path / "xprt_switch_info")
+         self.xprts = sorted([Xprt(p) for p in self.path.iterdir()
+                              if p.is_dir()])
+-        self.sep = sep
+ 
+     def __lt__(self, rhs):
+         """Compare the name of two xprt switch instances."""
+@@ -198,7 +199,7 @@ class XprtSwitch:
+ 
+     def __str__(self):
+         """Return a string representation of an xprt switch."""
+-        switch = f"{self.name}{self.sep} " \
++        switch = f"{self.name}: " \
+                  f"xprts {self.info['num_xprts']}, " \
+                  f"active {self.info['num_active']}, " \
+                  f"queue {self.info['queue_len']}"
+@@ -212,6 +213,12 @@ class XprtSwitch:
+         parser.set_defaults(func=XprtSwitch.show, switch=None)
+         subparser = parser.add_subparsers()
+ 
++        add = subparser.add_parser("add-xprt",
++                                   help="Add an xprt to the switch")
++        add.add_argument("switch", metavar="SWITCH", nargs=1,
++                         help="Name of a specific xprt switch to modify")
++        add.set_defaults(func=XprtSwitch.add_xprt)
++
+         show = subparser.add_parser("show", help="Show xprt switches")
+         show.add_argument("switch", metavar="SWITCH", nargs='?',
+                           help="Name of a specific switch to show")
+@@ -235,6 +242,11 @@ class XprtSwitch:
+             return [XprtSwitch(xprt_switches / name)]
+         return [XprtSwitch(f) for f in sorted(xprt_switches.iterdir())]
+ 
++    def add_xprt(args):
++        """Handle the `rpcctl switch add-xprt` command."""
++        for switch in XprtSwitch.get_by_name(args.switch[0]):
++            write_sysfs_file(switch.path / "add_xprt", "1")
++
+     def show(args):
+         """Handle the `rpcctl switch show` command."""
+         for switch in XprtSwitch.get_by_name(args.switch):
+@@ -256,7 +268,11 @@ class RpcClient:
+         """Read in rpc client information from sysfs."""
+         self.path = path
+         self.name = path.stem
+-        self.switch = XprtSwitch(path / (path / "switch").readlink(), sep=",")
++        self.switch = XprtSwitch(path / (path / "switch").readlink())
++        self.program = read_sysfs_file(path / "program", missing="unknown")
++        self.version = read_sysfs_file(path / "rpc_version", missing="unknown")
++        self.max_connect = read_sysfs_file(path / "max_connect",
++                                           missing="unknown")
+ 
+     def __lt__(self, rhs):
+         """Compare the name of two rpc client instances."""
+@@ -264,7 +280,9 @@ class RpcClient:
+ 
+     def __str__(self):
+         """Return a string representation of an rpc client."""
+-        return f"{self.name}: {self.switch}"
++        return f"{self.name}: {self.program}, rpc version {self.version}, " \
++               f"max_connect {self.max_connect}" \
++               f"\n  {' ' * len(self.name)}{self.switch}"
+ 
+     def add_command(subparser):
+         """Add parser options for the `rpcctl client` command."""
+diff --git a/utils/gssd/krb5_util.c b/utils/gssd/krb5_util.c
+index 560e8be1..09625fb9 100644
+--- a/utils/gssd/krb5_util.c
++++ b/utils/gssd/krb5_util.c
+@@ -619,6 +619,7 @@ get_full_hostname(const char *inhost, char *outhost, int outhostlen)
+ 		goto out;
+ 	}
+ 	strncpy(outhost, addrs->ai_canonname, outhostlen);
++	outhost[outhostlen - 1] = '\0';
+ 	nfs_freeaddrinfo(addrs);
+ 	for (c = outhost; *c != '\0'; c++)
+ 	    *c = tolower(*c);
+diff --git a/utils/nfsdcld/nfsdcld.c b/utils/nfsdcld/nfsdcld.c
+index f7737d92..8551dc97 100644
+--- a/utils/nfsdcld/nfsdcld.c
++++ b/utils/nfsdcld/nfsdcld.c
+@@ -822,6 +822,7 @@ main(int argc, char **argv)
+ 	evbase = event_base_new();
+ 	if (evbase == NULL) {
+ 		fprintf(stderr, "%s: unable to allocate event base.\n", argv[0]);
++		free(progname);
+ 		return 1;
+ 	}
+ 	xlog_syslog(0);
+diff --git a/utils/nfsdctl/nfsdctl.c b/utils/nfsdctl/nfsdctl.c
+index 733756a9..e7a0e124 100644
+--- a/utils/nfsdctl/nfsdctl.c
++++ b/utils/nfsdctl/nfsdctl.c
+@@ -436,7 +436,7 @@ static struct nl_msg *netlink_msg_alloc(struct nl_sock *sock, const char *family
+ 
+ 	id = genl_ctrl_resolve(sock, family);
+ 	if (id < 0) {
+-		xlog(L_ERROR, "%s not found", NFSD_FAMILY_NAME);
++		xlog(L_ERROR, "failed to resolve %s generic netlink family", family);
+ 		return NULL;
+ 	}
+ 
+@@ -447,7 +447,7 @@ static struct nl_msg *netlink_msg_alloc(struct nl_sock *sock, const char *family
+ 	}
+ 
+ 	if (!genlmsg_put(msg, 0, 0, id, 0, 0, 0, 0)) {
+-		xlog(L_ERROR, "failed to allocate netlink message");
++		xlog(L_ERROR, "failed to add generic netlink headers to netlink message");
+ 		nlmsg_free(msg);
+ 		return NULL;
+ 	}
+@@ -1417,7 +1417,6 @@ static int lockd_configure(struct nl_sock *sock, int grace)
+ {
+ 	char *tcp_svc, *udp_svc;
+ 	int tcpport = 0, udpport = 0;
+-	int ret;
+ 
+ 	tcp_svc = conf_get_str("lockd", "port");
+ 	if (tcp_svc) {
+@@ -1432,6 +1431,8 @@ static int lockd_configure(struct nl_sock *sock, int grace)
+ 		if (udpport < 0)
+ 			return 1;
+ 	}
++
++	return lockd_config_doit(sock, LOCKD_CMD_SERVER_SET, grace, tcpport, udpport);
+ }
+ 
+ static int
+@@ -1520,7 +1521,7 @@ static int configure_versions(void)
+ 
+ static int configure_listeners(void)
+ {
+-	char *port, *rdma_port;
++	char *port, *rdma_port = NULL;
+ 	bool rdma, udp, tcp;
+ 	struct conf_list *hosts;
+ 	int ret = 0;
+@@ -1592,8 +1593,6 @@ static int autostart_func(struct nl_sock *sock, int argc, char ** argv)
+ 		}
+ 	}
+ 
+-	read_nfsd_conf();
+-
+ 	grace = conf_get_num("nfsd", "grace-time", 0);
+ 	ret = lockd_configure(sock, grace);
+ 	if (ret) {
+@@ -1676,10 +1675,7 @@ static void nlm_usage(void)
+ 
+ static int nlm_func(struct nl_sock *sock, int argc, char ** argv)
+ {
+-	int *threads, grace, lease, idx, ret, opt, pools;
+-	struct conf_list *thread_str;
+-	struct conf_list_node *n;
+-	char *scope, *pool_mode;
++	int opt;
+ 
+ 	optind = 1;
+ 	while ((opt = getopt_long(argc, argv, "h", help_only_options, NULL)) != -1) {
+@@ -1824,6 +1820,8 @@ int main(int argc, char **argv)
+ 	xlog_syslog(0);
+ 	xlog_stderr(1);
+ 
++	read_nfsd_conf();
++
+ 	/* Parse the preliminary options */
+ 	while ((opt = getopt_long(argc, argv, "+hdsV", pre_options, NULL)) != -1) {
+ 		switch (opt) {
