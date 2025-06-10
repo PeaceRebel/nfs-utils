@@ -266,6 +266,12 @@ fi
 
 %preun
 %systemd_preun nfs-client.target nfs-server.service
+%systemd_preun auth-rpcgss-module.service
+%systemd_preun fsidd.service
+%systemd_preun nfs-blkmap.service
+%systemd_preun rpc-gssd.service
+%systemd_preun rpc-statd-notify.service
+%systemd_preun var-lib-nfs-rpc_pipefs.mount
 if [ $1 -eq 0 ]; then
     ( : >%{_localstatedir}/lib/rpm-state/nfs-server.cleanup ) || :
 fi
