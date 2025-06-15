@@ -2,7 +2,7 @@ Summary: NFS utilities and supporting clients and daemons for the kernel NFS ser
 Name: nfs-utils
 URL: http://linux-nfs.org/
 Version: 2.8.3
-Release: 1.rc2%{?dist}
+Release: 2.rc2%{?dist}
 Epoch: 1
 
 # group all 32bit related archs
@@ -446,6 +446,9 @@ rm -rf /etc/systemd/system/rpc-*.requires
 %{_mandir}/*/nfsiostat.8.gz
 
 %changelog
+* Sun Jun 15 2025 Scott Mayhew <smayhew@redhat.com> 2.8.3-2.rc2
+- Ensure services are stopped when nfs-utils is uninstalled
+
 * Thu Jun  5 2025 Steve Dickson <steved@redhat.com> 2.8.3-1.rc2
 - Updated to the latest RC release: nfs-utils-2-8-4-rc2
 
