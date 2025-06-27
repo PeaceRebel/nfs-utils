@@ -159,7 +159,7 @@ index f49e7776..a8476038 100644
  .BR nfsmount.conf (5).
 diff --git a/systemd/nfsroot-generator.c b/systemd/nfsroot-generator.c
 new file mode 100644
-index 00000000..52bd0752
+index 00000000..f3cb60c3
 --- /dev/null
 +++ b/systemd/nfsroot-generator.c
 @@ -0,0 +1,243 @@
@@ -243,10 +243,10 @@ index 00000000..52bd0752
 +		/* Mount type: "nfs" or "nfs4" */
 +		colon = strchr(root, ':');
 +		if (colon == NULL)
-+			return EINVAL;
++			return 0;
 +		if (strncmp(root, "nfs:", strlen("nfs:")) &&
 +			strncmp(root, "nfs4:", strlen("nfs4:")))
-+			return EINVAL;
++			return 0;
 +
 +		nfsroot = colon + 1;
 +	}
@@ -612,6 +612,32 @@ index 0221fbb6..29ae7d26 100755
  
      def add_command(subparser):
          """Add parser options for the `rpcctl client` command."""
+diff --git a/utils/exportfs/exportfs.c b/utils/exportfs/exportfs.c
+index b03a047b..748c38e3 100644
+--- a/utils/exportfs/exportfs.c
++++ b/utils/exportfs/exportfs.c
+@@ -74,13 +74,19 @@ grab_lockfile(void)
+ {
+ 	_lockfd = open(lockfile, O_CREAT|O_RDWR, 0666);
+ 	if (_lockfd != -1)
+-		lockf(_lockfd, F_LOCK, 0);
++		if (lockf(_lockfd, F_LOCK, 0) != 0) {
++			xlog_warn("%s: lockf() failed: errno %d (%s)",
++			__func__, errno, strerror(errno));
++		}
+ }
+ static void
+ release_lockfile(void)
+ {
+ 	if (_lockfd != -1) {
+-		lockf(_lockfd, F_ULOCK, 0);
++		if (lockf(_lockfd, F_ULOCK, 0) != 0) {
++			xlog_warn("%s: lockf() failed: errno %d (%s)",
++			__func__, errno, strerror(errno));
++		}
+ 		close(_lockfd);
+ 		_lockfd = -1;
+ 	}
 diff --git a/utils/gssd/krb5_util.c b/utils/gssd/krb5_util.c
 index 560e8be1..09625fb9 100644
 --- a/utils/gssd/krb5_util.c
